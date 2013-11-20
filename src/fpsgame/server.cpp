@@ -4490,9 +4490,11 @@ namespace server
                     ParseCommand (cq, &text[1]);
                     return; 
                 }
-                QUEUE_AI;
-                QUEUE_MSG;
+                //QUEUE_AI;
+                //QUEUE_MSG;
                 filtertext(text, text);
+                QUEUE_AI;
+                QUEUE_INT(N_TEXT);
                 QUEUE_STR(text);
                 if(isdedicatedserver() && cq) logoutf("%s: %s", colorname(cq), text);
                 break;
