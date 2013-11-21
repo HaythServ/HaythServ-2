@@ -3461,7 +3461,7 @@ namespace server
                 acc.privileges = clamp (privileges, (int) PRIV_NONE, (int) PRIV_ROOT);
             }
 
-            void NewReserve (const char * name, const char * username)
+            void NewReserve (const char * username, const char * name)
             {
                 int Counter = 0;
                 account * acc = 0;
