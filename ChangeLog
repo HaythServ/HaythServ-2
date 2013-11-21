@@ -1,0 +1,27 @@
+ChangeLog
+=========
+
+haythserv-2-0-0
+
+   * Added persist player-command.
+   * Added noclearbots player-command.
+   * Added functions to change messages decorations (~> and <~ by default)
+   * Added exec player-command.
+   * Added pban player-command.
+   * Added getip player-command.
+   * Added anti-cheat (still needs many implementations).
+
+haythserv-2-0-0rc
+
+   * Added flagruns system. 
+
+haythserv-2-0-0b2
+
+   * Added stats player command. 
+
+haythserv-2-0-0b1
+
+   * Added C++ Player commands system.
+   * Added accounting system.
+   * Added root privilege level.
+   * Added rename player-command. 
