@@ -4061,7 +4061,7 @@ namespace server
             void _INFO (clientinfo * ci, const char * Args)
             {
                 string Message;
-                formatstring (Message)("\f%s> \f4HaythServ\f3-v2.0 \f4server mod, \f0based on \f3ORIGINAL SERVER\f4. \f3%s",
+                formatstring (Message)("\f%s \f4HaythServ\f3-v2.0 \f4server mod, \f0based on \f3ORIGINAL SERVER\f4. \f3%s",
                     MessageDecoration1,
                     MessageDecoration2
                 );
@@ -5025,15 +5025,15 @@ namespace server
                 // Name protection at name change
                 loopv (reserved_names)
                 {
-                    if (!strcmp (ci->name, reserved_names[i].name) && !ci->verified && ci->acc->username != reserved_names[i].acc->username)
+                    if (!strcmp (ci->name, reserved_names[i].name) && ci->acc->username != reserved_names[i].acc->username)
                     {
                         Rename (ci);
                         return;
                     }
                 }
-                QUEUE_MSG;
+                QUEUE_INT (N_SWITCHNAME);
                 if(!ci->name[0]) copystring(ci->name, "unnamed");
-                QUEUE_STR(ci->name);
+                QUEUE_STR (ci->name);
                 break;
             }
 

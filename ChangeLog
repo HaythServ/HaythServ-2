@@ -1,6 +1,10 @@
 ChangeLog
 =========
 
+haythserv-2-0-2
+
+   * Bugfixed #2.
+
 haythserv-2-0-1
     
    * Added master password.
