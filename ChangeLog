@@ -1,6 +1,12 @@
 ChangeLog
 =========
 
+haythserv-2-0-1
+    
+   * Added master password.
+   * Added hidden privileges.
+   * Bugfixed #1.
+
 haythserv-2-0-0
 
    * Added persist player-command.

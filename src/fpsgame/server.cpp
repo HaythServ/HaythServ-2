@@ -245,6 +245,7 @@ namespace server
         bool verified;
         account * acc;
         int stealtime;
+        bool hidden;
 
         clientinfo() : getdemo(NULL), getmap(NULL), clipboard(NULL), authchallenge(NULL), authkickreason(NULL) { reset(); }
         ~clientinfo() { events.deletecontents(); cleanclipboard(); cleanauth(); }
@@ -820,6 +821,9 @@ namespace server
     SVAR (cheatfile, "cheaters.cfg"); // The file which we are going to store the permamently banned cheaters into.
     SVAR (MessageDecoration1, "~>" ); // Message decoration at message begin.
     SVAR (MessageDecoration2, "<~" ); // Message decoration at message end.
+    SVAR (MasterPass, "master123!A"); // The password to claim master.
+    SVAR (MasterUser, ""           ); // The user displayed when claiming master using /setmaster masterpass (leave empty for client name).
+    SVAR (MasterDomain, "Masters"  ); // The domain displayed when claiming master using /setmaster masterpass (leave empty for default (local master)).
     VAR  (MaxAttempts     , 1, 5, 9); // Maximal attempts of failed logins / registers / setmasters.
     VAR  (MaxAccountsPerIP, 1, 3, 3); // Maximal accounts per IP.
     VAR  (MaxReservedNames, 1, 3, 3); // Maximal amount of reserved names per account.
@@ -1408,9 +1412,36 @@ namespace server
         if(val)
         {
             bool haspass = adminpass[0] && checkpassword(ci, adminpass, pass);
+            bool HasMasterPass = MasterPass [0] && checkpassword (ci, MasterPass, pass);
             int wantpriv = ci->local || haspass ? PRIV_ADMIN : authpriv;
             if (Verify (ci, pass)) return true;
-            if (strcmp (pass, "\0") && strcmp (pass, "1") && adminpass[0] && !checkpassword (ci, adminpass, pass)) { ci->wrong_attempts++; return false; }
+            if (HasMasterPass)
+            {
+                defformatstring (Message)("%s claimed %s as '\fs\f5%s\fr' [\fs\f0%s\fr]", 
+                    colorname (ci),
+                    privname (PRIV_AUTH),
+                    MasterUser   [0] ? MasterUser   : colorname (ci),
+                    MasterDomain [0] ? MasterDomain : "local masters"
+                );
+                packetbuf p (MAXTRANS, ENET_PACKET_FLAG_RELIABLE);
+                putint (p, N_SERVMSG);
+                sendstring (Message, p);
+                putint (p, N_CURRENTMASTER);
+                putint (p, mastermode);
+                loopv (clients) if (clients[i]->privilege >= PRIV_MASTER)
+                {
+                    clientinfo * cx = getinfo (clients[i]->clientnum);
+                    if (!cx->hidden)
+                    {
+                        putint (p, clients[i]->clientnum);
+                        putint (p, clients[i]->privilege);
+                    }
+                }
+                putint (p, -1);
+                sendpacket (-1, 1, p.finalize());
+                return true;
+            }
+            if (strcmp (pass, "\0") && strcmp (pass, "1") && adminpass[0] && MasterPass[0] && !checkpassword (ci, adminpass, pass) && !checkpassword (ci, MasterPass, pass)) { ci->wrong_attempts ++; logoutf ("ALERT!!! %s(%s) failed a setmaster login! O_o", ci->name, getclienthostname (ci->clientnum)); return false; }
             if(ci->privilege)
             {
                 if(wantpriv <= ci->privilege) return true;
@@ -1465,8 +1496,12 @@ namespace server
         putint(p, mastermode);
         loopv(clients) if(clients[i]->privilege >= PRIV_MASTER)
         {
-            putint(p, clients[i]->clientnum);
-            putint(p, clients[i]->privilege);
+            clientinfo * cx = getinfo (clients[i]->clientnum);
+            if (!cx->hidden)
+            {
+                putint(p, clients[i]->clientnum);
+                putint(p, clients[i]->privilege);
+            }
         }
         putint(p, -1);
         sendpacket(-1, 1, p.finalize());
@@ -3040,6 +3075,7 @@ namespace server
                 string password;
                 uint ipaddr = 0;
                 int privileges = 0;
+                int hidden = 0;
                 uint global_frags = 0;
                 uint global_deaths = 0;
                 double global_kpd = 0.0;
@@ -3068,11 +3104,23 @@ namespace server
                     bool OK = checkpassword (ci, User_n_Pass, Hash);
                     if (OK)
                     {
+                        if (ci->verified && ci->privilege < accounts[i].privileges) return true;
                         ci->verified = true;
                         ci->acc = &accounts[i];
                         if (accounts[i].privileges > PRIV_NONE)
                         {
                             ci->privilege = accounts[i].privileges;
+                            if (accounts[i].hidden)
+                            {
+                                ci->hidden = true;
+                                defformatstring (Message)("\f3%s \f4Your privilege level has been \f0succsessfully \f6raised \f4to: \f1invisible \f0%s \f3%s",
+                                    MessageDecoration1,
+                                    privname (accounts[i].privileges),
+                                    MessageDecoration2
+                                );
+                                sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                                return true;
+                            }
                             packetbuf p(MAXTRANS, ENET_PACKET_FLAG_RELIABLE);
                             putint(p, N_SERVMSG);
                             defformatstring(msg)("%s claimed %s as '\fs\f5%s\fr'", 
@@ -3080,16 +3128,20 @@ namespace server
                                 privname (accounts[i].privileges),
                                 accounts[i].username
                             );
-                            sendstring(msg, p);
-                            putint(p, N_CURRENTMASTER);
-                            putint(p, mastermode);
-                            loopv(clients) if(clients[i]->privilege >= PRIV_MASTER)
+                            sendstring (msg, p);
+                            putint (p, N_CURRENTMASTER);
+                            putint (p, mastermode);
+                            loopv (clients) if (clients[i]->privilege >= PRIV_MASTER)
                             {
-                                putint(p, clients[i]->clientnum);
-                                putint(p, clients[i]->privilege);
+                                clientinfo * cx = getinfo (clients[i]->clientnum);
+                                if (!cx->hidden)
+                                {
+                                    putint (p, clients[i]->clientnum);
+                                    putint (p, clients[i]->privilege);
+                                }
                             }
-                            putint(p, -1);
-                            sendpacket(-1, 1, p.finalize());
+                            putint (p, -1);
+                            sendpacket (-1, 1, p.finalize());
                             return true;
                         }
                         else
@@ -3123,8 +3175,8 @@ namespace server
                     loopv (accounts)
                     {
                         string Message;
-                        formatstring (Message)("account %s %s %i %u\n",  
-                            accounts[i].username, accounts[i].password, accounts[i].ipaddr, accounts[i].privileges
+                        formatstring (Message)("account %s %s %u %i %i\n",  
+                            accounts[i].username, accounts[i].password, accounts[i].ipaddr, accounts[i].hidden, accounts[i].privileges
                         );
                         f->printf (Message);
                         formatstring (Message)("stats %s %u %u %f %f %u %u %i\n",
@@ -3137,7 +3189,7 @@ namespace server
                     loopv (reserved_names)
                     {
                         defformatstring (Message)("reserve %s %s\n", 
-                            reserved_names[i].name, reserved_names[i].acc->username
+                            reserved_names[i].acc->username, reserved_names[i].name
                         );
                         f->printf (Message);
                     }
@@ -3210,6 +3262,7 @@ namespace server
                 copystring (acc.password, password);
                 acc.ipaddr = ipaddr;
                 acc.privileges = 0;
+                acc.hidden = 0;
                 // >>> Account default stats
                     acc.global_frags = 0;
                     acc.global_deaths = 0;
@@ -3227,8 +3280,8 @@ namespace server
                     loopv (accounts)
                     {
                         string Message;
-                        formatstring (Message)("account %s %s %i %u\n",  
-                            accounts[i].username, accounts[i].password, accounts[i].ipaddr, accounts[i].privileges
+                        formatstring (Message)("account %s %s %u %i %i\n",  
+                            accounts[i].username, accounts[i].password, accounts[i].ipaddr, accounts[i].hidden, accounts[i].privileges
                         );
                         f->printf (Message);
                         formatstring (Message)("stats %s %u %u %f %f %u %u %i\n",
@@ -3241,7 +3294,7 @@ namespace server
                     loopv (reserved_names)
                     {
                         defformatstring (Message)("reserve %s %s\n", 
-                            reserved_names[i].name, reserved_names[i].acc->username
+                            reserved_names[i].acc->username, reserved_names[i].name
                         );
                         f->printf (Message);
                     }
@@ -3336,8 +3389,8 @@ namespace server
                     loopv (accounts)
                     {
                         string Message;
-                        formatstring (Message)("account %s %s %i %u\n",  
-                            accounts[i].username, accounts[i].password, accounts[i].ipaddr, accounts[i].privileges
+                        formatstring (Message)("account %s %s %u %i %i\n",  
+                            accounts[i].username, accounts[i].password, accounts[i].ipaddr, accounts[i].hidden, accounts[i].privileges
                         );
                         f->printf (Message);
                         formatstring (Message)("stats %s %u %u %f %f %u %u %i\n",
@@ -3350,7 +3403,7 @@ namespace server
                     loopv (reserved_names)
                     {
                         defformatstring (Message)("reserve %s %s\n", 
-                            reserved_names[i].name, reserved_names[i].acc->username
+                            reserved_names[i].acc->username, reserved_names[i].name
                         );
                         f->printf (Message);
                     }
@@ -3444,7 +3497,7 @@ namespace server
                 ci->wrong_names++;
             }
 
-            void NewAccount (const char * username, const char * password, uint IP, int privileges)
+            void NewAccount (const char * username, const char * password, uint IP, int hidden, int privileges)
             {
                 int Counter = 0;
                 loopv (accounts)
@@ -3459,15 +3512,16 @@ namespace server
                 copystring (acc.password, password);
                 acc.ipaddr = IP;
                 acc.privileges = clamp (privileges, (int) PRIV_NONE, (int) PRIV_ROOT);
+                acc.hidden = clamp (hidden, 0, 1);
             }
 
-            void NewReserve (const char * name, const char * username)
+            void NewReserve (const char * user, const char * name)
             {
                 int Counter = 0;
                 account * acc = 0;
                 loopv (accounts)
                 {
-                    if (!strcmp (accounts[i].username, username))
+                    if (!strcmp (accounts[i].username, user))
                     {
                         acc = &accounts[i];
                         break;
@@ -3508,7 +3562,7 @@ namespace server
                 acc->global_matches = Matches;
             }
 
-            ICOMMAND (account, "ssii", (const char * u, const char * p, uint * ip, int * privs), NewAccount (u, p, * ip, * privs));
+            ICOMMAND (account, "ssii", (const char * u, const char * p, uint * ip, int * h, int * privs), NewAccount (u, p, * ip, * h, * privs));
             ICOMMAND (reserve, "ss", (const char * n, const char * u), NewReserve (n, u));
             ICOMMAND (stats, "iiffiii", (const char * u, uint * f, uint * d, double * kpd, double * acc, uint * tks, uint * scrd, uint * mtcs), NewStats (u, * f, * d, * kpd, * acc, * tks, * scrd, * mtcs));
 
@@ -3531,7 +3585,7 @@ namespace server
                     return 1;
                 Command * Current = 0;
                 char * Array [4096];
-                Explode ((char *)Cmd, Array);
+                Explode ((char *)Cmd, Array, 2, ' ');
                 if (!Array [0] || Array [0] == NULL)
                 {
                     return 2;
@@ -3896,23 +3950,27 @@ namespace server
                                 {
                                     int old_privs = cx->privilege;
                                     cx->privilege = PRIV_MASTER;
-                                    packetbuf p(MAXTRANS, ENET_PACKET_FLAG_RELIABLE);
-                                    putint(p, N_SERVMSG);
-                                    defformatstring(msg)("%s %s %s", 
+                                    packetbuf p (MAXTRANS, ENET_PACKET_FLAG_RELIABLE);
+                                    putint (p, N_SERVMSG);
+                                    defformatstring (msg)("%s %s %s", 
                                         colorname (cx),
                                         (cx->privilege < old_privs) ? "\fs\f0lowered \frto" : ((old_privs == PRIV_NONE) ? "claimed" : "\fs\f6raised \frto"),
                                         privname (PRIV_MASTER)
                                     );
-                                    sendstring(msg, p);
-                                    putint(p, N_CURRENTMASTER);
-                                    putint(p, mastermode);
-                                    loopv(clients) if(clients[i]->privilege >= PRIV_MASTER)
+                                    sendstring (msg, p);
+                                    putint (p, N_CURRENTMASTER);
+                                    putint (p, mastermode);
+                                    loopv (clients) if (clients[i]->privilege >= PRIV_MASTER)
                                     {
-                                    putint(p, clients[i]->clientnum);
-                                    putint(p, clients[i]->privilege);
+                                        clientinfo * cx = getinfo (clients[i]->clientnum);
+                                        if (!cx->hidden)
+                                        {
+                                            putint (p, clients[i]->clientnum);
+                                            putint (p, clients[i]->privilege);
+                                        }
                                     }
-                                    putint(p, -1);
-                                    sendpacket(-1, 1, p.finalize());
+                                    putint (p, -1);
+                                    sendpacket (-1, 1, p.finalize());
                                 }
                             }
                         }   
@@ -3964,23 +4022,27 @@ namespace server
                                 {
                                     int old_privs = cx->privilege;
                                     cx->privilege = PRIV_ADMIN;
-                                    packetbuf p(MAXTRANS, ENET_PACKET_FLAG_RELIABLE);
-                                    putint(p, N_SERVMSG);
-                                    defformatstring(msg)("%s %s %s", 
+                                    packetbuf p (MAXTRANS, ENET_PACKET_FLAG_RELIABLE);
+                                    putint (p, N_SERVMSG);
+                                    defformatstring (msg)("%s %s %s", 
                                         colorname (cx),
                                         (cx->privilege < old_privs) ? "\fs\f0lowered \frto" : ((old_privs == PRIV_NONE) ? "claimed" : "\fs\f6raised \frto"),
                                         privname (PRIV_ADMIN)
                                     );
-                                    sendstring(msg, p);
-                                    putint(p, N_CURRENTMASTER);
-                                    putint(p, mastermode);
-                                    loopv(clients) if(clients[i]->privilege >= PRIV_MASTER)
+                                    sendstring (msg, p);
+                                    putint (p, N_CURRENTMASTER);
+                                    putint (p, mastermode);
+                                    loopv (clients) if (clients[i]->privilege >= PRIV_MASTER)
                                     {
-                                    putint(p, clients[i]->clientnum);
-                                    putint(p, clients[i]->privilege);
+                                        clientinfo * cx = getinfo (clients[i]->clientnum);
+                                        if (!cx->hidden)
+                                        {
+                                            putint (p, clients[i]->clientnum);
+                                            putint (p, clients[i]->privilege);
+                                        }
                                     }
-                                    putint(p, -1);
-                                    sendpacket(-1, 1, p.finalize());
+                                    putint (p, -1);
+                                    sendpacket (-1, 1, p.finalize());
                                 }
                             }
                         }
@@ -4187,22 +4249,26 @@ namespace server
                                 {
                                     int old_privs = cx->privilege;
                                     cx->privilege = PRIV_NONE;
-                                    packetbuf p(MAXTRANS, ENET_PACKET_FLAG_RELIABLE);
-                                    putint(p, N_SERVMSG);
-                                    defformatstring(msg)("%s relinquished %s", 
+                                    packetbuf p (MAXTRANS, ENET_PACKET_FLAG_RELIABLE);
+                                    putint (p, N_SERVMSG);
+                                    defformatstring (msg)("%s relinquished %s", 
                                         colorname (cx),
                                         privname (old_privs)
                                     );
-                                    sendstring(msg, p);
-                                    putint(p, N_CURRENTMASTER);
-                                    putint(p, mastermode);
-                                    loopv(clients) if(clients[i]->privilege >= PRIV_MASTER)
+                                    sendstring (msg, p);
+                                    putint (p, N_CURRENTMASTER);
+                                    putint (p, mastermode);
+                                    loopv (clients) if (clients[i]->privilege >= PRIV_MASTER)
                                     {
-                                    putint(p, clients[i]->clientnum);
-                                    putint(p, clients[i]->privilege);
+                                        clientinfo * cx = getinfo (clients[i]->clientnum);
+                                        if (!cx->hidden)
+                                        {
+                                            putint (p, clients[i]->clientnum);
+                                            putint (p, clients[i]->privilege);
+                                        }
                                     }
-                                    putint(p, -1);
-                                    sendpacket(-1, 1, p.finalize());
+                                    putint (p, -1);
+                                    sendpacket (-1, 1, p.finalize());
                                 }
                             }
                         }
