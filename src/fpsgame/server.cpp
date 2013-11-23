@@ -2330,6 +2330,7 @@ namespace server
             if(dup || h.dist<0 || h.dist>guns[gun].exprad)
             {
                 cheater (ci, CHEAT_EXPLOSION);
+                return;
             }
 
             int damage = guns[gun].damage;
