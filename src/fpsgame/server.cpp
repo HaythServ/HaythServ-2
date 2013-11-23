@@ -369,6 +369,29 @@ namespace server
         }
     };
 
+    SVAR (frunsfile, "flagruns.cfg"); // The file which we are going to store the flagruns into.
+    SVAR (loginfile, "accounts.cfg"); // The file which we are going to store the accounts into.
+    SVAR (cheatfile, "cheaters.cfg"); // The file which we are going to store the permamently banned cheaters into.
+    SVAR (MessageDecoration1, "~>" ); // Message decoration at message begin.
+    SVAR (MessageDecoration2, "<~" ); // Message decoration at message end.
+    SVAR (MasterPass, "master123!A"); // The password to claim master.
+    SVAR (MasterUser, ""           ); // The user displayed when claiming master using /setmaster masterpass (leave empty for client name).
+    SVAR (MasterDomain, "Masters"  ); // The domain displayed when claiming master using /setmaster masterpass (leave empty for default (local master)).
+    VAR  (MaxAttempts     , 1, 5, 9); // Maximal attempts of failed logins / registers / setmasters.
+    VAR  (MaxAccountsPerIP, 1, 3, 3); // Maximal accounts per IP.
+    VAR  (MaxReservedNames, 1, 3, 3); // Maximal amount of reserved names per account.
+    VAR  (HSAntiCheat     , 0, 1, 1); // Enables HaythServ-Anti-Cheat.
+    VAR  (HSACFlagTime,250,500,2500); // If the time used to score the flag is lower than this, then the server will ban the client for cheating (flag hacking).
+
+    void sendservmsg(const char *s) { sendf(-1, 1, "ris", N_SERVMSG, s); }
+    void sendservmsgf(const char *fmt, ...)
+    {
+         defvformatstring(s, fmt, fmt);
+         sendf(-1, 1, "ris", N_SERVMSG, s);
+    }
+
+    #include "anticheat.hpp"
+
     struct ban
     {
         int time, expire;
@@ -626,13 +649,13 @@ namespace server
     SVAR(serverpass, "");
     SVAR(adminpass, "");
     VARF(publicserver, 0, 0, 2, {
-        switch(publicserver)
-        {
-            case 0: default: mastermask = MM_PRIVSERV; break;
-            case 1: mastermask = MM_PUBSERV; break;
-            case 2: mastermask = MM_COOPSERV; break;
-        }
-    });
+		switch(publicserver)
+		{
+			case 0: default: mastermask = MM_PRIVSERV; break;
+			case 1: mastermask = MM_PUBSERV; break;
+			case 2: mastermask = MM_COOPSERV; break;
+		}
+	});
     SVAR(servermotd, "");
 
     struct teamkillkick
@@ -760,13 +783,6 @@ namespace server
         }
     }
 
-    void sendservmsg(const char *s) { sendf(-1, 1, "ris", N_SERVMSG, s); }
-    void sendservmsgf(const char *fmt, ...)
-    {
-         defvformatstring(s, fmt, fmt);
-         sendf(-1, 1, "ris", N_SERVMSG, s);
-    }
-
     void resetitems()
     {
         mcrc = 0;
@@ -815,20 +831,6 @@ namespace server
         formatstring(cname[cidx])(ci->state.aitype == AI_NONE ? "%s \fs\f5(%d)\fr" : "%s \fs\f5[%d]\fr", name, ci->clientnum);
         return cname[cidx];
     }
-
-    SVAR (frunsfile, "flagruns.cfg"); // The file which we are going to store the flagruns into.
-    SVAR (loginfile, "accounts.cfg"); // The file which we are going to store the accounts into.
-    SVAR (cheatfile, "cheaters.cfg"); // The file which we are going to store the permamently banned cheaters into.
-    SVAR (MessageDecoration1, "~>" ); // Message decoration at message begin.
-    SVAR (MessageDecoration2, "<~" ); // Message decoration at message end.
-    SVAR (MasterPass, "master123!A"); // The password to claim master.
-    SVAR (MasterUser, ""           ); // The user displayed when claiming master using /setmaster masterpass (leave empty for client name).
-    SVAR (MasterDomain, "Masters"  ); // The domain displayed when claiming master using /setmaster masterpass (leave empty for default (local master)).
-    VAR  (MaxAttempts     , 1, 5, 9); // Maximal attempts of failed logins / registers / setmasters.
-    VAR  (MaxAccountsPerIP, 1, 3, 3); // Maximal accounts per IP.
-    VAR  (MaxReservedNames, 1, 3, 3); // Maximal amount of reserved names per account.
-    VAR  (HSAntiCheat     , 0, 1, 1); // Enables HaythServ-Anti-Cheat.
-    VAR  (HSACFlagTime,250,500,2500); // If the time used to score the flag is lower than this, then the server will ban the client for cheating (flag hacking).
 
     void InitializeCommands ();
     void InitializeManpages ();
@@ -2321,11 +2323,14 @@ namespace server
         {
             hitinfo &h = hits[i];
             clientinfo *target = getinfo(h.target);
-            if(!target || target->state.state!=CS_ALIVE || h.lifesequence!=target->state.lifesequence || h.dist<0 || h.dist>guns[gun].exprad) continue;
+            if(!target || target->state.state!=CS_ALIVE || h.lifesequence!=target->state.lifesequence) continue;
 
             bool dup = false;
             loopj(i) if(hits[j].target==h.target) { dup = true; break; }
-            if(dup) continue;
+            if(dup || h.dist<0 || h.dist>guns[gun].exprad)
+            {
+                cheater (ci, CHEAT_EXPLOSION);
+            }
 
             int damage = guns[gun].damage;
             if(gs.quadmillis) damage *= 4;
@@ -2339,11 +2344,36 @@ namespace server
     {
         gamestate &gs = ci->state;
         int wait = millis - gs.lastshot;
-        if(!gs.isalive(gamemillis) ||
+        /* if(!gs.isalive(gamemillis) ||
            wait<gs.gunwait ||
            gun<GUN_FIST || gun>GUN_PISTOL ||
            gs.ammo[gun]<=0 || (guns[gun].range && from.dist(to) > guns[gun].range + 1))
+            return; */
+        if (gun < GUN_FIST || gun > GUN_PISTOL) 
+        {
+            cheater (ci, CHEAT_WRONGGUN);
             return;
+        }
+        if (gs.ammo [gun] <= 0)
+        {
+            cheater (ci, CHEAT_NOAMMO);
+            return;
+        }
+        if (wait < gs.gunwait)
+        {
+            cheater (ci, CHEAT_FASTRELOAD);
+            return;
+        }
+        if (!gs.isalive (gamemillis))
+        {
+            cheater (ci, CHEAT_NOTALIVE);
+            return;
+        }
+        if (m_insta && gun != GUN_FIST && gun != GUN_RIFLE)
+        {
+            cheater (ci, CHEAT_INSTAGUN);
+            return;
+        }
         if(gun!=GUN_FIST) gs.ammo[gun]--;
         gs.lastshot = millis;
         gs.gunwait = guns[gun].attackdelay;
@@ -2363,10 +2393,23 @@ namespace server
                 {
                     hitinfo &h = hits[i];
                     clientinfo *target = getinfo(h.target);
-                    if(!target || target->state.state!=CS_ALIVE || h.lifesequence!=target->state.lifesequence || h.rays<1 || h.dist > guns[gun].range + 1) continue;
-
+                    if(!target || target->state.state!=CS_ALIVE || h.lifesequence!=target->state.lifesequence) continue;
+                    if (h.rays<1)
+                    {
+                        cheater (ci, CHEAT_NORAYS);
+                        break;
+                    }
+                    if (h.dist > guns[gun].range + 1)
+                    {
+                        cheater (ci, CHEAT_GUNRANGE);
+                        break;
+                    }
                     totalrays += h.rays;
-                    if(totalrays>maxrays) continue;
+                    if(totalrays > maxrays)
+                    {
+                        cheater (ci, CHEAT_GUNRAYS);
+                        break;
+                    }
                     int damage = h.rays*guns[gun].damage;
                     if(gs.quadmillis) damage *= 4;
                     dodamage(target, ci, damage, gun, h.dir);
@@ -2908,78 +2951,6 @@ namespace server
 
         // <<< Core functions
 
-        // >>> HaythServ-Anti-Cheat
-
-#define FLAGHACK 1
-#define EDITHACK 2
-
-            struct Cheater
-            {
-                uint IP;
-            };
-            vector <Cheater> Cheaters;
-
-            void AddPban (uint ip)
-            {
-                loopv (Cheaters)
-                {
-                    if (Cheaters [i].IP == ip) return;
-                }
-                Cheater & Pban = Cheaters.add ();
-                Pban.IP = ip;
-            }
-
-            ICOMMAND (pban, "i", (uint * IP), AddPban (* IP));
-
-            void Bancheater (clientinfo * ci, const char * Cheat)
-            {
-                const char * Name = ci->name;
-                int Cn = ci->clientnum;
-                Cheater & Cur = Cheaters.add ();
-                Cur.IP = getclientip (ci->clientnum);
-                sendservmsgf ("\f3%s \f4Client \f0%s\f4(\f0%is\f4) has been disconnected for cheating. \f3(%s) \f3%s",
-                    MessageDecoration1,
-                    Name,
-                    Cn,
-                    Cheat,
-                    MessageDecoration2
-                );
-                stream *f = openutf8file(cheatfile, "w");
-                if(f)
-                {
-                    f->printf("// Automatically generated by HaythServ-v2.0 - do not edit.\n");
-                    f->printf("// Contains a list of permamently banned cheaters.\n");
-                    f->printf("// Also contains a list of other permamently banned clients using #pban <cn>.\n\n");
-                    loopv (Cheaters)
-                    {
-                        defformatstring (Message)("pban %i\n", 
-                            Cheaters [i].IP
-                        );
-                        f->printf (Message);
-                    }
-                    delete f;
-                }
-                disconnect_client (ci->clientnum, DISC_IPBAN);
-            }
-
-            int cheater (clientinfo * ci, int Cheat)
-            {
-                switch (Cheat)
-                {
-                    case FLAGHACK:
-                        Bancheater (ci, "flag hack");
-                        break;
-                    case EDITHACK:
-                        Bancheater (ci, "edit mode in non coop-edit gamemode.");
-                        break;
-                    default:
-                        return 0;
-                }
-                return Cheat;
-            }
-
-        // <<< HaythServ-Anti-Cheat
-
         // >>> Flagruns core
 
             struct flagrun
@@ -2995,7 +2966,7 @@ namespace server
             {
                 if (flagruntime < HSACFlagTime)
                 {
-                    cheater (ci, FLAGHACK);
+                    cheater (ci, CHEAT_FLAGHACK);
                 }
                 else
                 {
@@ -3456,7 +3427,7 @@ namespace server
                         }
                         else
                         {
-                            formatstring (Message)("\f3%s \f4Cannot change \f6%s\f4's privilege level: \f6Old privileges and new privileges are same. \f3%s~",
+                            formatstring (Message)("\f3%s \f4Cannot change \f6%s\f4's privilege level: \f6Old privileges and new privileges are same. \f3%s",
                                 MessageDecoration1,
                                 accounts[i].username,
                                 MessageDecoration2
@@ -3573,7 +3544,8 @@ namespace server
             struct Command
             {
                 string Name;
-                int RequiredPrivileges;
+                bool RequiresVerify = false;
+                int RequiredPrivileges = PRIV_NONE;
                 void (* Function) (clientinfo * ci, const char * Arguments);
             };
 
@@ -3622,13 +3594,14 @@ namespace server
                 return 0;
             }
 
-            int NewCommand (const char * Name, int RequiredPrivileges, void (* Function) (clientinfo * ci, const char * Args))
+            int NewCommand (const char * Name, bool RequiresVerify, int RequiredPrivileges, void (* Function) (clientinfo * ci, const char * Args))
             {
                 loopv (Commands)
                     if (!strcmp (Commands[i].Name, Name)) { return 1; }
                 uint Current = Commands.length ();
                 Commands.add ();
                 copystring (Commands[Current].Name, Name);
+                Commands[Current].RequiresVerify = RequiresVerify;
                 Commands[Current].RequiredPrivileges = RequiredPrivileges;
                 Commands[Current].Function = Function;
                 return 0;
@@ -3712,7 +3685,7 @@ namespace server
                 );
                 loopv (Commands)
                 {
-                    if (Commands[i].RequiredPrivileges == PRIV_NONE)
+                    if (Commands[i].RequiredPrivileges == PRIV_NONE && (ci->verified == true || Commands[i].RequiresVerify == false))
                     {
                         copystring (Bak, Message);
                         formatstring (Message) ("%s\f4#\f7%s ", Bak, Commands[i].Name);
@@ -3724,7 +3697,7 @@ namespace server
                     formatstring (Message)("%s\n\f0", Bak);
                     loopv (Commands)
                     {
-                        if (Commands[i].RequiredPrivileges == PRIV_MASTER)
+                        if (Commands[i].RequiredPrivileges == PRIV_MASTER && (ci->verified == true || Commands[i].RequiresVerify == false))
                         {
                    
                             copystring (Bak, Message);
@@ -3738,7 +3711,7 @@ namespace server
                     formatstring (Message)("%s\n\f6", Bak);
                     loopv (Commands)
                     {
-                        if (Commands[i].RequiredPrivileges == PRIV_ADMIN)
+                        if (Commands[i].RequiredPrivileges == PRIV_ADMIN && (ci->verified == true || Commands[i].RequiresVerify == false))
                         {
                             copystring (Bak, Message);
                             formatstring (Message) ("%s\f4#\f6%s ", Bak, Commands[i].Name);
@@ -3751,7 +3724,7 @@ namespace server
                     formatstring (Message)("%s\n\f6", Bak);
                     loopv (Commands)
                     {
-                        if (Commands[i].RequiredPrivileges == PRIV_ROOT)
+                        if (Commands[i].RequiredPrivileges == PRIV_ROOT && (ci->verified == true || Commands[i].RequiresVerify == false))
                         {
                             copystring (Bak, Message);
                             formatstring (Message) ("%s\f4#\f3%s ", Bak, Commands[i].Name);
@@ -4583,23 +4556,23 @@ namespace server
 
             void InitializeCommands ()
             {
-                NewCommand ("man"        , PRIV_NONE  , _HELP       );
-                NewCommand ("help"       , PRIV_NONE  , _HELP       );
-                NewCommand ("info"       , PRIV_NONE  , _INFO       );
-                NewCommand ("login"      , PRIV_NONE  , _LOGIN      );
-                NewCommand ("reserve"    , PRIV_NONE  , _RESERVE    );
-                NewCommand ("register"   , PRIV_NONE  , _REGISTER   );
-                NewCommand ("pm"         , PRIV_NONE  , _MSG        );
-                NewCommand ("stats"      , PRIV_NONE  , _STATS      );
-                NewCommand ("givemaster" , PRIV_MASTER, _GIVEMASTER );
-                NewCommand ("giveadmin"  , PRIV_ADMIN , _GIVEADMIN  );
-                NewCommand ("rename"     , PRIV_ADMIN , _RENAME     );
-                NewCommand ("setprivs"   , PRIV_ROOT  , _SETPRIVS   );
-                NewCommand ("revokepriv" , PRIV_MASTER, _REVOKEPRIV );
-                NewCommand ("persist"    , PRIV_MASTER, _PERSIST    );
-                NewCommand ("noclearbots", PRIV_ADMIN , _NOCLEARBOTS);
-                NewCommand ("exec"       , PRIV_ROOT  , _EXEC       );
-                NewCommand ("getip"      , PRIV_ADMIN , _GETIP      );
+                NewCommand ("man"        , false, PRIV_NONE  , _HELP       );
+                NewCommand ("help"       , false, PRIV_NONE  , _HELP       );
+                NewCommand ("info"       , false, PRIV_NONE  , _INFO       );
+                NewCommand ("login"      , false, PRIV_NONE  , _LOGIN      );
+                NewCommand ("reserve"    , false, PRIV_NONE  , _RESERVE    );
+                NewCommand ("register"   , false, PRIV_NONE  , _REGISTER   );
+                NewCommand ("pm"         , false, PRIV_NONE  , _MSG        );
+                NewCommand ("stats"      , false, PRIV_NONE  , _STATS      );
+                NewCommand ("givemaster" , false, PRIV_MASTER, _GIVEMASTER );
+                NewCommand ("giveadmin"  , false, PRIV_ADMIN , _GIVEADMIN  );
+                NewCommand ("rename"     , false, PRIV_ADMIN , _RENAME     );
+                NewCommand ("setprivs"   , false, PRIV_ROOT  , _SETPRIVS   );
+                NewCommand ("revokepriv" , false, PRIV_MASTER, _REVOKEPRIV );
+                NewCommand ("persist"    , false, PRIV_MASTER, _PERSIST    );
+                NewCommand ("noclearbots", false, PRIV_ADMIN , _NOCLEARBOTS);
+                NewCommand ("exec"       , false, PRIV_ROOT  , _EXEC       );
+                NewCommand ("getip"      , false, PRIV_ADMIN , _GETIP      );
             }
 
             void InitializeManpages ()
@@ -4829,7 +4802,7 @@ namespace server
             case N_EDITMODE:
             {
                 int val = getint(p);
-                if(!ci->local && !m_edit) { cheater (ci, EDITHACK); break; }
+                if(!ci->local && !m_edit) { cheater (ci, CHEAT_EDITHACK); break; }
                 if(val ? ci->state.state!=CS_ALIVE && ci->state.state!=CS_DEAD : ci->state.state!=CS_EDITING) break;
                 if(smode)
                 {
@@ -4894,6 +4867,16 @@ namespace server
             {
                 int gunselect = getint(p);
                 if(!cq || cq->state.state!=CS_ALIVE) break;
+                if (gunselect < GUN_FIST || gunselect > GUN_PISTOL)
+                {
+                    cheater (cq, CHEAT_WRONGGUN);
+                    return;
+                }
+                if (m_insta && gunselect != GUN_FIST && gunselect != GUN_RIFLE)
+                {
+                    cheater (cq, CHEAT_INSTAGUN);
+                    return;
+                }
                 cq->state.gunselect = gunselect >= GUN_FIST && gunselect <= GUN_PISTOL ? gunselect : GUN_FIST;
                 QUEUE_AI;
                 QUEUE_MSG;
@@ -4978,6 +4961,11 @@ namespace server
             {
                 int n = getint(p);
                 if(!cq) break;
+                if (m_noitems)
+                {
+                    cheater (ci, CHEAT_PICKUP);
+                    return;
+                }
                 pickupevent *pickup = new pickupevent;
                 pickup->ent = n;
                 cq->addevent(pickup);
@@ -5092,7 +5080,7 @@ namespace server
                 loopk(3) getint(p);
                 int type = getint(p);
                 loopk(5) getint(p);
-                if (!m_edit) {cheater (ci, EDITHACK); break;}
+                if (!m_edit) {cheater (ci, CHEAT_EDITHACK); break;}
                 if(!ci || ci->state.state==CS_SPECTATOR) break;
                 QUEUE_MSG;
                 bool canspawn = canspawnitem(type);
@@ -5507,5 +5495,4 @@ namespace server
 
     #include "aiman.h"
 }
-
 

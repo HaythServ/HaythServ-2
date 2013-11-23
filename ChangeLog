@@ -1,12 +1,17 @@
 ChangeLog
 =========
 
+haythserv-2-0-3
+
+   * Improved anti-cheat.
+   * Added support for verified-users-only player-commands.
+
 haythserv-2-0-2
 
    * Bugfixed #2.
 
 haythserv-2-0-1
-    
+
    * Added master password.
    * Added hidden privileges.
    * Bugfixed #1.
