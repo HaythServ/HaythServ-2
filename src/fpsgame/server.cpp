@@ -3690,7 +3690,7 @@ namespace server
                 SetRanking ();
             }
 
-            ICOMMAND (account, "ssii", (const char * u, const char * p, const char * ip, int * h, int * privs), NewAccount (u, p, ip, * h, * privs));
+            ICOMMAND (account, "sssii", (const char * u, const char * p, const char * ip, int * h, int * privs), NewAccount (u, p, ip, * h, * privs));
             ICOMMAND (reserve, "ss", (const char * n, const char * u), NewReserve (n, u));
             ICOMMAND (stats, "siiffiii", (const char * u, uint * f, uint * d, double * acc, uint * tks, uint * scrd, uint * mtcs), NewStats (u, * f, * d, * acc, * tks, * scrd, * mtcs));
             ICOMMAND (clantag, "sss", (const char * o, const char * n, const char * t), NewTagReserve (o, n, t));
