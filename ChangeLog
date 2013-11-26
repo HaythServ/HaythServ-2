@@ -1,42 +1,50 @@
 ChangeLog
 =========
 
+haythserv-2-0-4
+
+    * Added Verbose option.
+    * Accounting system changes.
+    * Added a ranking system.
+    * Bugfixed #3.
+    * Bugfixed #4.
+
 haythserv-2-0-3
 
-   * Improved anti-cheat.
-   * Added support for verified-users-only player-commands.
+    * Improved anti-cheat.
+    * Added support for verified-users-only player-commands.
 
 haythserv-2-0-2
 
-   * Bugfixed #2.
+    * Bugfixed #2.
 
 haythserv-2-0-1
 
-   * Added master password.
-   * Added hidden privileges.
-   * Bugfixed #1.
+    * Added master password.
+    * Added hidden privileges.
+    * Bugfixed #1.
 
 haythserv-2-0-0
 
-   * Added persist player-command.
-   * Added noclearbots player-command.
-   * Added functions to change messages decorations (~> and <~ by default)
-   * Added exec player-command.
-   * Added pban player-command.
-   * Added getip player-command.
-   * Added anti-cheat (still needs many implementations).
+    * Added persist player-command.
+    * Added noclearbots player-command.
+    * Added functions to change messages decorations (~> and <~ by default)
+    * Added exec player-command.
+    * Added pban player-command.
+    * Added getip player-command.
+    * Added anti-cheat (still needs many implementations).
 
 haythserv-2-0-0rc
 
-   * Added flagruns system. 
+    * Added flagruns system. 
 
 haythserv-2-0-0b2
 
-   * Added stats player command. 
+    * Added stats player command. 
 
 haythserv-2-0-0b1
 
-   * Added C++ Player commands system.
-   * Added accounting system.
-   * Added root privilege level.
-   * Added rename player-command. 
+    * Added C++ Player commands system.
+    * Added accounting system.
+    * Added root privilege level.
+    * Added rename player-command. 

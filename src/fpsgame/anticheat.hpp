@@ -29,7 +29,7 @@ void AddPban (uint ip)
 
 ICOMMAND (pban, "i", (uint * IP), AddPban (* IP));
 
-void Bancheater (clientinfo * ci, const char * Cheat)
+void Bancheater (clientinfo * ci, const char * Cheat, int CHEAT)
 {
     const char * Name = ci->name;
     int Cn = ci->clientnum;
@@ -67,54 +67,50 @@ void Bancheater (clientinfo * ci, const char * Cheat)
     disconnect_client (ci->clientnum, DISC_IPBAN);
 }
 
-int cheater (clientinfo * cq, int Cheat)
+int cheater (clientinfo * ci, int Cheat)
 {
-    clientinfo * ci;
-    if (cq->state.aitype == AI_NONE)
+    if (ci->state.aitype != AI_NONE)
     {
-        ci = cq;
+        return -1;
     }
-    else
-    {
-        ci = (clientinfo *) getclientinfo (cq->ownernum);
-    }
+    
     switch (Cheat)
     {
         case CHEAT_FLAGHACK:
-            Bancheater (ci, "flag hack");
+            Bancheater (ci, "flag hack", CHEAT_FLAGHACK);
             break;
         case CHEAT_EDITHACK:
-            Bancheater (ci, "edit mode in non coop-edit gamemode");
+            Bancheater (ci, "edit mode in non coop-edit gamemode", CHEAT_EDITHACK);
             break;
         case CHEAT_WRONGGUN:
-            Bancheater (ci, "wrong gun");
+            Bancheater (ci, "wrong gun", CHEAT_WRONGGUN);
             break;
         case CHEAT_INSTAGUN:
-            Bancheater (ci, "non instagib weapon");
+            Bancheater (ci, "non instagib weapon", CHEAT_INSTAGUN);
             break;
         case CHEAT_EXPLOSION:
-            Bancheater (ci, "explosion hack");
+            Bancheater (ci, "explosion hack", CHEAT_EXPLOSION);
             break;
         case CHEAT_NOAMMO:
-            Bancheater (ci, "no ammo");
+            Bancheater (ci, "no ammo", CHEAT_NOAMMO);
             break;
         case CHEAT_FASTRELOAD:
-            Bancheater (ci, "modified weapon reload time");
+            Bancheater (ci, "modified weapon reload time", CHEAT_FASTRELOAD);
             break;
         case CHEAT_NOTALIVE:
-            Bancheater (ci, "trying to shoot without being alive");
+            Bancheater (ci, "trying to shoot without being alive", CHEAT_NOTALIVE);
             break;
         case CHEAT_NORAYS:
-            Bancheater (ci, "disabled gun rays");
+            Bancheater (ci, "disabled gun rays", CHEAT_NORAYS);
             break;
         case CHEAT_GUNRANGE:
-            Bancheater (ci, "modified gun range");
+            Bancheater (ci, "modified gun range", CHEAT_GUNRANGE);
             break;
         case CHEAT_GUNRAYS:
-            Bancheater (ci, "modified gun rays");
+            Bancheater (ci, "modified gun rays", CHEAT_GUNRAYS);
             break;
         case CHEAT_PICKUP:
-            Bancheater (ci, "trying to pickup an item in a m_noitems gamemode");
+            Bancheater (ci, "trying to pickup an item in a m_noitems gamemode", CHEAT_PICKUP);
             break;
         default:
             return 0;

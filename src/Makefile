@@ -158,7 +158,7 @@ enet/libenet.a:
 
 libenet: enet/libenet.a
 
-clean-enet: enet/Makefile
+clean-enet: enet/libenet.a
 	$(MAKE) -C enet/ clean
 
 clean:
@@ -506,3 +506,4 @@ fpsgame/server-standalone.o: fpsgame/aiman.h
 engine/master-standalone.o: shared/cube.h shared/tools.h shared/geom.h
 engine/master-standalone.o: shared/ents.h shared/command.h shared/iengine.h
 engine/master-standalone.o: shared/igame.h
+
