@@ -1,4 +1,4 @@
-CXXFLAGS= -Ofast -fstack-protector -march=native -pipe -fomit-frame-pointer -ffast-math -std=c++11
+CXXFLAGS= -Ofast -fstack-protector -fomit-frame-pointer -std=c++11
 override CXXFLAGS+= -Wall -fsigned-char -fno-exceptions -fno-rtti
 
 PLATFORM= $(shell uname -s)
@@ -51,7 +51,7 @@ endif
 CLIENT_LIBS= -mwindows $(STD_LIBS) -L$(WINBIN) -L$(WINLIB) -lSDL -lSDL_image -lSDL_mixer -lzlib1 -lopengl32 -lenet -lws2_32 -lwinmm
 else	
 CLIENT_INCLUDES= $(INCLUDES) -I/usr/X11R6/include `sdl-config --cflags`
-CLIENT_LIBS= -Lenet -lenet -L/usr/X11R6/lib -lX11 `sdl-config --libs` -lSDL_image -lSDL_mixer -lz -lGL
+CLIENT_LIBS= -Lenet/.libs -lenet -L/usr/X11R6/lib -lX11 `sdl-config --libs` -lSDL_image -lSDL_mixer -lz -lGL
 endif
 ifeq ($(PLATFORM),Linux)
 CLIENT_LIBS+= -lrt
@@ -124,7 +124,7 @@ SERVER_LIBS= -mwindows $(STD_LIBS) -L$(WINBIN) -L$(WINLIB) -lzlib1 -lenet -lws2_
 MASTER_LIBS= $(STD_LIBS) -L$(WINBIN) -L$(WINLIB) -lzlib1 -lenet -lws2_32 -lwinmm
 else
 SERVER_INCLUDES= -DSTANDALONE $(INCLUDES)
-SERVER_LIBS= -Lenet -lenet -lz
+SERVER_LIBS= -Lenet/.libs -lenet -lz
 MASTER_LIBS= $(SERVER_LIBS)
 endif
 SERVER_OBJS= \
@@ -151,13 +151,22 @@ endif
 
 default: all
 
-all: server master
+all: server
+
+enet/Makefile:
+	cd enet; ./configure --enable-shared=no --enable-static=yes
+	
+libenet: enet/Makefile
+	$(MAKE)	-C enet/ all
+
+clean-enet: enet/Makefile
+	$(MAKE) -C enet/ clean
 
 clean:
 	-$(RM) $(CLIENT_PCH) $(CLIENT_OBJS) $(SERVER_OBJS) $(MASTER_OBJS) sauer_client sauer_server sauer_master
 
 %.h.gch: %.h
-	$(CXX) $(CXXFLAGS) -x c++-header -o $(subst .h.gch,.tmp.h.gch,$@) $(subst .h.gch,.h,$@)
+	$(CXX) $(CXXFLAGS) -o $(subst .h.gch,.tmp.h.gch,$@) $(subst .h.gch,.h,$@)
 	$(MV) $(subst .h.gch,.tmp.h.gch,$@) $@
 
 %-standalone.o: %.cpp
@@ -183,7 +192,7 @@ server: $(SERVER_OBJS)
 master: $(MASTER_OBJS)
 	$(CXX) $(CXXFLAGS) -o $(WINBIN)/sauer_master.exe $(MASTER_OBJS) $(MASTER_LIBS)
 
-install: all
+#install: all
 else
 client:	libenet $(CLIENT_OBJS)
 	$(CXX) $(CXXFLAGS) -o sauer_client $(CLIENT_OBJS) $(CLIENT_LIBS)
@@ -200,18 +209,26 @@ shared/cube2font.o: shared/cube2font.c
 cube2font: shared/cube2font.o
 	$(CXX) $(CXXFLAGS) -o cube2font shared/cube2font.o `freetype-config --libs` -lz
 
-install: all
-	cp sauer_client	../bin_unix/$(PLATFORM_PREFIX)_client
-	cp sauer_server	../bin_unix/$(PLATFORM_PREFIX)_server
-ifneq (,$(STRIP))
-	$(STRIP) ../bin_unix/$(PLATFORM_PREFIX)_client
-	$(STRIP) ../bin_unix/$(PLATFORM_PREFIX)_server
-endif
+#install: all
+#	cp sauer_server	../sauer_server
+#ifneq (,$(STRIP))
+#	$(STRIP) ../sauer_server
+#endif
 endif
 
-enet/libenet.a:
-	$(MAKE) -C enet
-libenet: enet/libenet.a
+install: all
+	cp sauer_server ../sauer_server
+	cp sauer_master ../sauer_master
+
+strip: all
+	$(STRIP) sauer_server
+	$(STRIP) sauer_master
+
+install-strip: all
+	cp sauer_server ../sauer_server
+	cp sauer_master ../sauer_master
+	$(STRIP) ../sauer_server
+	$(STRIP) ../sauer_master
 
 depend:
 	makedepend -Y -Ishared -Iengine -Ifpsgame $(subst .o,.cpp,$(CLIENT_OBJS))
