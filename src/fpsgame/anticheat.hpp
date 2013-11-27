@@ -1,15 +1,17 @@
 #define CHEAT_FLAGHACK   1
 #define CHEAT_EDITHACK   2
-#define CHEAT_WRONGGUN   3
-#define CHEAT_INSTAGUN   4
-#define CHEAT_EXPLOSION  5
-#define CHEAT_NOAMMO     6
-#define CHEAT_FASTRELOAD 7
-#define CHEAT_NOTALIVE   8
-#define CHEAT_NORAYS     9
-#define CHEAT_GUNRANGE   10
-#define CHEAT_GUNRAYS    11
-#define CHEAT_PICKUP     12
+#define CHEAT_EDITMSG    3
+#define CHEAT_WRONGGUN   4
+#define CHEAT_INSTAGUN   5
+#define CHEAT_EXPLOSION  6
+#define CHEAT_NOAMMO     7
+#define CHEAT_FASTRELOAD 8
+#define CHEAT_NOTALIVE   9
+#define CHEAT_NORAYS     10
+#define CHEAT_GUNRANGE   11
+#define CHEAT_GUNRAYS    12
+#define CHEAT_PICKUP     13
+#define CHEAT_MSGSIZE    14
 
 struct Cheater
 {
@@ -35,11 +37,12 @@ void Bancheater (clientinfo * ci, const char * Cheat, int CHEAT)
     int Cn = ci->clientnum;
     Cheater & Cur = Cheaters.add ();
     Cur.IP = getclientip (ci->clientnum);
-    sendservmsgf ("\f3%s \f4Client \f0%s \f4(\f0%s\f4) has been disconnected for cheating \f4(\f3%s\f4). \f3%s",
+    sendservmsgf ("\f3%s \f4Client \f0%s \f4(\f0%s\f4) has been disconnected for cheating \f4(\f3%s\f4, %i). \f3%s",
         MessageDecoration1,
         Name,
         getclienthostname (Cn),
         Cheat,
+        CHEAT,
         MessageDecoration2
     );
     logoutf ("%s Client %s (%s) has been disconnected for cheating (%s). %s",
@@ -57,7 +60,7 @@ void Bancheater (clientinfo * ci, const char * Cheat, int CHEAT)
         f->printf("// Also contains a list of other permamently banned clients using #pban <cn>.\n\n");
         loopv (Cheaters)
         {
-            defformatstring (Message)("pban %i\n", 
+            defformatstring (Message)("pban %u\n", 
                 Cheaters [i].IP
             );
             f->printf (Message);
@@ -81,6 +84,9 @@ int cheater (clientinfo * ci, int Cheat)
             break;
         case CHEAT_EDITHACK:
             Bancheater (ci, "edit mode in non coop-edit gamemode", CHEAT_EDITHACK);
+            break;
+        case CHEAT_EDITMSG:
+            Bancheater (ci, "edit messages in non coop-edit gamemode", CHEAT_EDITMSG);
             break;
         case CHEAT_WRONGGUN:
             Bancheater (ci, "wrong gun", CHEAT_WRONGGUN);
@@ -111,6 +117,9 @@ int cheater (clientinfo * ci, int Cheat)
             break;
         case CHEAT_PICKUP:
             Bancheater (ci, "trying to pickup an item in a m_noitems gamemode", CHEAT_PICKUP);
+            break;
+        case CHEAT_MSGSIZE:
+            Bancheater (ci, "wrong message size", CHEAT_MSGSIZE);
             break;
         default:
             return 0;

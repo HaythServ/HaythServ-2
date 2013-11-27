@@ -240,12 +240,15 @@ namespace server
         void *authchallenge;
         int authkickvictim;
         char *authkickreason;
-        int wrong_attempts;
-        int wrong_names;
-        bool verified;
-        account * acc;
-        int stealtime;
-        bool hidden;
+        // >>> HaythServ-2
+            int wrong_attempts;
+            int wrong_names;
+            bool verified;
+            account * acc;
+            int stealtime;
+            bool hidden;
+            bool textmute, editmute, namemute, teammute, fullmute;
+        // <<< HaythServ-2
 
         clientinfo() : getdemo(NULL), getmap(NULL), clipboard(NULL), authchallenge(NULL), authkickreason(NULL) { reset(); }
         ~clientinfo() { events.deletecontents(); cleanclipboard(); cleanauth(); }
@@ -652,13 +655,13 @@ namespace server
     SVAR(serverpass, "");
     SVAR(adminpass, "");
     VARF(publicserver, 0, 0, 2, {
-        switch(publicserver)
-        {
-            case 0: default: mastermask = MM_PRIVSERV; break;
-            case 1: mastermask = MM_PUBSERV; break;
-            case 2: mastermask = MM_COOPSERV; break;
-        }
-    });
+		switch(publicserver)
+		{
+			case 0: default: mastermask = MM_PRIVSERV; break;
+			case 1: mastermask = MM_PUBSERV; break;
+			case 2: mastermask = MM_COOPSERV; break;
+		}
+	});
     SVAR(servermotd, "");
 
     struct teamkillkick
@@ -3179,7 +3182,7 @@ namespace server
                     }
                     loopv (ReservedTags)
                     {
-                        formatstring (Message)("clantag %s %s %s\n",
+                        formatstring (Message)("clantag \"%s\" \"%s\" \"%s\"\n",
                             ReservedTags[i].owner->username, ReservedTags[i].clanname, ReservedTags[i].clantag
                         );
                         f->printf (Message);
@@ -3323,7 +3326,7 @@ namespace server
                     }
                     loopv (ReservedTags)
                     {
-                        formatstring (Message)("clantag %s %s %s\n",
+                        formatstring (Message)("clantag \"%s\" \"%s\" \"%s\"\n",
                             ReservedTags[i].owner->username, ReservedTags[i].clanname, ReservedTags[i].clantag
                         );
                         f->printf (Message);
@@ -3446,7 +3449,7 @@ namespace server
                     }
                     loopv (ReservedTags)
                     {
-                        formatstring (Message)("clantag %s %s %s\n",
+                        formatstring (Message)("clantag \"%s\" \"%s\" \"%s\"\n",
                             ReservedTags[i].owner->username, ReservedTags[i].clanname, ReservedTags[i].clantag
                         );
                         f->printf (Message);
@@ -3652,20 +3655,25 @@ namespace server
                     Counter++;
                 }
                 if (Counter >= MaxMembers) { if (Verbose) { logoutf ("Ignoring new clantag authorized user: Members limit reached for clan %s", Clan->clanname); } return; }
-                account * Cur = &Clan->AuthorizedAccounts.add ();
-                copystring (Cur->username, acc->username);
-                copystring (Cur->password, acc->password);
-                copystring (Cur->ipaddr,   acc->ipaddr);
-                Cur->privileges = acc->privileges;
-                Cur->hidden = acc->hidden;
-                Cur->global_frags = acc->global_frags;
-                Cur->global_deaths = acc->global_deaths;
-                Cur->global_kpd = acc->global_kpd;
-                Cur->global_accuracy = acc->global_accuracy;
-                Cur->global_teamkills = acc->global_teamkills;
-                Cur->global_scored = acc->global_scored;
-                Cur->global_matches = acc->global_matches;
-                Cur->global_ranking = acc->global_ranking;
+                int i = Clan->AuthorizedAccounts.length ();
+                Clan->AuthorizedAccounts.add ();
+                Clan->AuthorizedAccounts[i] = * acc;
+                /*
+                    account * Cur = &Clan->AuthorizedAccounts.add ();
+                    copystring (Cur->username, acc->username);
+                    copystring (Cur->password, acc->password);
+                    copystring (Cur->ipaddr,   acc->ipaddr);
+                    Cur->privileges = acc->privileges;
+                    Cur->hidden = acc->hidden;
+                    Cur->global_frags = acc->global_frags;
+                    Cur->global_deaths = acc->global_deaths;
+                    Cur->global_kpd = acc->global_kpd;
+                    Cur->global_accuracy = acc->global_accuracy;
+                    Cur->global_teamkills = acc->global_teamkills;
+                    Cur->global_scored = acc->global_scored;
+                    Cur->global_matches = acc->global_matches;
+                    Cur->global_ranking = acc->global_ranking;
+                */
             }
 
             void NewStats (const char * user, uint frags, uint deaths, double Acc, uint TKs, uint Scored, uint Matches)
@@ -3693,10 +3701,45 @@ namespace server
             ICOMMAND (account, "sssii", (const char * u, const char * p, const char * ip, int * h, int * privs), NewAccount (u, p, ip, * h, * privs));
             ICOMMAND (reserve, "ss", (const char * n, const char * u), NewReserve (n, u));
             ICOMMAND (stats, "siiffiii", (const char * u, uint * f, uint * d, double * acc, uint * tks, uint * scrd, uint * mtcs), NewStats (u, * f, * d, * acc, * tks, * scrd, * mtcs));
-            ICOMMAND (clantag, "sss", (const char * o, const char * n, const char * t), NewTagReserve (o, n, t));
+            ICOMMAND (clantag, "sss", (const char * o, const char * n, const char * t), NewTagReserve (o, t, n));
             ICOMMAND (authorize, "ss", (const char * n, const char * u), NewAuthorized (n, u));
 
         // <<< Accounting system core
+
+        // >>> Playermuting system core
+
+            void Mute (int Mode, int CN, int Enable)
+            {
+                clientinfo * ci = getinfo (CN);
+                if (!ci) return;
+                if (Mode < 1 || Mode > 5) return;
+                switch (Mode)
+                {
+                    case 1:
+                        ci->textmute = Enable;
+                        return;
+                    case 2:
+                        ci->editmute = Enable;
+                        return;
+                    case 3:
+                        ci->namemute = Enable;
+                        return;
+                    case 4:
+                        ci->teammute = Enable;
+                        return;
+                    case 5:
+                        // Fullmute deactivates all normal mutes, no matter
+                        // if fullmute is going to be enabled or disabled.
+                        ci->textmute = 0;
+                        ci->editmute = 0;
+                        ci->namemute = 0;
+                        ci->teammute = 0;
+                        ci->fullmute = Enable;
+                        return;
+                }
+            }
+
+        // <<< Playermuting systemc ore
 
         // >>> Commands system core
 
@@ -3780,7 +3823,7 @@ namespace server
 
             void Help (clientinfo * ci, const char * Args)
             {
-                string Message;
+                char Message [4096];
                 char * Array [4096];
                 Explode ((char *) Args, Array, 2, ' ');
                 const char * Cmd = Array [0];
@@ -3837,8 +3880,8 @@ namespace server
 
             void Help (clientinfo * ci)
             {
-                string Message;
-                string Bak;
+                char Message [4096];
+                char Bak     [4096];
                 formatstring (Message)("\f3%s \f0Commands list:\n", 
                     MessageDecoration1
                 );
@@ -3850,44 +3893,86 @@ namespace server
                         formatstring (Message) ("%s\f4#\f7%s ", Bak, Commands[i].Name);
                     }
                 }
-                if (ci->privilege >= PRIV_MASTER)
+                if (ci->privilege < PRIV_MASTER)
                 {
                     copystring (Bak, Message);
-                    formatstring (Message)("%s\n\f0", Bak);
-                    loopv (Commands)
+                    formatstring (Message)("%s\f3%s",
+                        Bak,
+                        MessageDecoration2
+                    );
+                    sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                    return;
+                }
+                else
+                {
+                    sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                    for (int i = 0; i < 4096; i++)
                     {
-                        if (Commands[i].RequiredPrivileges == PRIV_MASTER && (ci->verified == true || Commands[i].RequiresVerify == false))
-                        {
-                   
-                            copystring (Bak, Message);
-                            formatstring (Message) ("%s\f4#\f0%s ", Bak, Commands[i].Name);
-                        }
+                        Message[i] = NULL;
                     }
                 }
-                if (ci->privilege >= PRIV_ADMIN)
+                formatstring (Message)("\f0");
+                loopv (Commands)
                 {
-                    copystring (Bak, Message);
-                    formatstring (Message)("%s\n\f6", Bak);
-                    loopv (Commands)
+                    if (Commands[i].RequiredPrivileges == PRIV_MASTER && (ci->verified == true || Commands[i].RequiresVerify == false))
                     {
-                        if (Commands[i].RequiredPrivileges == PRIV_ADMIN && (ci->verified == true || Commands[i].RequiresVerify == false))
-                        {
-                            copystring (Bak, Message);
-                            formatstring (Message) ("%s\f4#\f6%s ", Bak, Commands[i].Name);
-                        }
+               
+                        copystring (Bak, Message);
+                        formatstring (Message) ("%s\f4#\f0%s ", Bak, Commands[i].Name);
                     }
                 }
-                if (ci->privilege >= PRIV_ROOT)
+                if (ci->privilege < PRIV_ADMIN)
                 {
                     copystring (Bak, Message);
-                    formatstring (Message)("%s\n\f6", Bak);
-                    loopv (Commands)
+                    formatstring (Message)("%s\f3%s",
+                        Bak,
+                        MessageDecoration2
+                    );
+                    sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                    return;
+                }
+                else
+                {
+                    sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                    for (int i = 0; i < 4096; i++)
                     {
-                        if (Commands[i].RequiredPrivileges == PRIV_ROOT && (ci->verified == true || Commands[i].RequiresVerify == false))
-                        {
-                            copystring (Bak, Message);
-                            formatstring (Message) ("%s\f4#\f3%s ", Bak, Commands[i].Name);
-                        }
+                        Message[i] = NULL;
+                    }
+                }
+                formatstring (Message)("\f6");
+                loopv (Commands)
+                {
+                    if (Commands[i].RequiredPrivileges == PRIV_ADMIN && (ci->verified == true || Commands[i].RequiresVerify == false))
+                    {
+                        copystring (Bak, Message);
+                        formatstring (Message) ("%s\f4#\f6%s ", Bak, Commands[i].Name);
+                    }
+                }
+                if (ci->privilege < PRIV_ROOT)
+                {
+                    copystring (Bak, Message);
+                    formatstring (Message)("%s\f3%s",
+                        Bak,
+                        MessageDecoration2
+                    );
+                    sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                    return;
+                }
+                else
+                {
+                    sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                    for (int i = 0; i < 4096; i++)
+                    {
+                        Message[i] = NULL;
+                    }
+                }
+                formatstring (Message)("\f6");
+                loopv (Commands)
+                {
+                    if (Commands[i].RequiredPrivileges == PRIV_ROOT && (ci->verified == true || Commands[i].RequiresVerify == false))
+                    {
+                        copystring (Bak, Message);
+                        formatstring (Message) ("%s\f4#\f3%s ", Bak, Commands[i].Name);
                     }
                 }
                 copystring (Bak, Message);
@@ -4709,6 +4794,234 @@ namespace server
                 }
             }
 
+            void _SENDTO (clientinfo * ci, const char * Args)
+            {
+                char * Array [4096];
+                Explode ((char *) Args, Array, 2, ' ');
+                if (Array[0] && Array[0] != NULL)
+                {
+                    char * cns [4096];
+                    Explode (Array[0], cns, 128, ',');
+                    for (int i = 0; i < 128; i++)
+                    {
+                        if (cns[i] && cns[i] != NULL)
+                        {
+                            int cn = atoi (cns[i]);
+                            clientinfo * cx = getinfo (cn);
+                            if (!cx)
+                            {
+                                defformatstring (Message)("\f3%s \f4Unknown client number: \f6%i \f3%s", 
+                                    MessageDecoration1,
+                                    cn,
+                                    MessageDecoration2
+                                );
+                                sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                            }
+                            else
+                            {
+                                if (!mapdata || cx->getmap) return;
+                                sendservmsgf("\f3%s \f4Sending the map to \f0%s\f4... \f3%s", 
+                                    MessageDecoration1,
+                                    colorname(cx),
+                                    MessageDecoration2
+                                );
+                                if((cx->getmap = sendfile(cx->clientnum, 2, mapdata, "ri", N_SENDMAP)))
+                                    cx->getmap->freeCallback = freegetmap;
+                                cx->needclipboard = totalmillis ? totalmillis : 1;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    defformatstring (Message)("\f3%s \f4Usage: \f6#sendto <cn[,cn2[,...]]> \f3%s",
+                        MessageDecoration1,
+                        MessageDecoration2
+                    );
+                    sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                }
+            }
+
+            void _TEXTMUTE (clientinfo * ci, const char * Args)
+            {
+                if (Args && strcmp (Args, "") && Args != NULL)
+                {
+                    char * Array [4096];
+                    Explode ((char *) Args, Array, 3, ' ');
+                    if (Array[0] && Array[0] != NULL)
+                    {
+                        clientinfo * cx = getinfo (atoi (Array [0]));
+                        if (!cx) return;
+                        int Mute_Unmute;
+                        if (Array[1] && Array [1] != NULL) 
+                            Mute_Unmute = atoi (Array [1]);
+                        else
+                            Mute_Unmute = (cx->textmute || cx->fullmute) ? 0 : 1;
+                        Mute (1, cx->clientnum, Mute_Unmute);
+                    }
+                    else
+                    {
+                        defformatstring (Message)("\f3%s \f4Usage: \f6#mute \f4<cn> (0/1) \f3%s",
+                            MessageDecoration1,
+                            MessageDecoration2
+                        );
+                        sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                    }
+                }
+                else
+                {
+                    defformatstring (Message)("\f3%s \f4Usage: \f6#mute \f4<cn> (0/1) \f3%s",
+                        MessageDecoration1,
+                        MessageDecoration2
+                    );
+                    sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                }
+            }
+
+            void _EDITMUTE (clientinfo * ci, const char * Args)
+            {
+                if (Args && strcmp (Args, "") && Args != NULL)
+                {
+                    char * Array [4096];
+                    Explode ((char *) Args, Array, 3, ' ');
+                    if (Array[0] && Array[0] != NULL)
+                    {
+                        clientinfo * cx = getinfo (atoi (Array [0]));
+                        if (!cx) return;
+                        int Mute_Unmute;
+                        if (Array[1] && Array [1] != NULL) 
+                            Mute_Unmute = atoi (Array [1]);
+                        else
+                            Mute_Unmute = (cx->editmute || cx->fullmute) ? 0 : 1;
+                        Mute (2, cx->clientnum, Mute_Unmute);
+                    }
+                    else
+                    {
+                        defformatstring (Message)("\f3%s \f4Usage: \f6#editmute \f4<cn> (0/1) \f3%s",
+                            MessageDecoration1,
+                            MessageDecoration2
+                        );
+                        sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                    }
+                }
+                else
+                {
+                    defformatstring (Message)("\f3%s \f4Usage: \f6#editmute \f4<cn> (0/1) \f3%s",
+                        MessageDecoration1,
+                        MessageDecoration2
+                    );
+                    sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                }
+            }
+
+            void _NAMEMUTE (clientinfo * ci, const char * Args)
+            {
+                if (Args && strcmp (Args, "") && Args != NULL)
+                {
+                    char * Array [4096];
+                    Explode ((char *) Args, Array, 3, ' ');
+                    if (Array[0] && Array[0] != NULL)
+                    {
+                        clientinfo * cx = getinfo (atoi (Array [0]));
+                        if (!cx) return;
+                        int Mute_Unmute;
+                        if (Array[1] && Array [1] != NULL) 
+                            Mute_Unmute = atoi (Array [1]);
+                        else
+                            Mute_Unmute = (cx->textmute || cx->fullmute) ? 0 : 1;
+                        Mute (3, cx->clientnum, Mute_Unmute);
+                    }
+                    else
+                    {
+                        defformatstring (Message)("\f3%s \f4Usage: \f6#namemute \f4<cn> (0/1) \f3%s",
+                            MessageDecoration1,
+                            MessageDecoration2
+                        );
+                        sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                    }
+                }
+                else
+                {
+                    defformatstring (Message)("\f3%s \f4Usage: \f6#namemute \f4<cn> (0/1) \f3%s",
+                        MessageDecoration1,
+                        MessageDecoration2
+                    );
+                    sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                }
+            }
+
+            void _TEAMMUTE (clientinfo * ci, const char * Args)
+            {
+                if (Args && strcmp (Args, "") && Args != NULL)
+                {
+                    char * Array [4096];
+                    Explode ((char *) Args, Array, 3, ' ');
+                    if (Array[0] && Array[0] != NULL)
+                    {
+                        clientinfo * cx = getinfo (atoi (Array [0]));
+                        if (!cx) return;
+                        int Mute_Unmute;
+                        if (Array[1] && Array [1] != NULL) 
+                            Mute_Unmute = atoi (Array [1]);
+                        else
+                            Mute_Unmute = (cx->teammute || cx->fullmute) ? 0 : 1;
+                        Mute (4, cx->clientnum, Mute_Unmute);
+                    }
+                    else
+                    {
+                        defformatstring (Message)("\f3%s \f4Usage: \f6#teammute \f4<cn> (0/1) \f3%s",
+                            MessageDecoration1,
+                            MessageDecoration2
+                        );
+                        sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                    }
+                }
+                else
+                {
+                    defformatstring (Message)("\f3%s \f4Usage: \f6#teammute \f4<cn> (0/1) \f3%s",
+                        MessageDecoration1,
+                        MessageDecoration2
+                    );
+                    sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                }
+            }
+
+            void _FULLMUTE (clientinfo * ci, const char * Args)
+            {
+                if (Args && strcmp (Args, "") && Args != NULL)
+                {
+                    char * Array [4096];
+                    Explode ((char *) Args, Array, 3, ' ');
+                    if (Array[0] && Array[0] != NULL)
+                    {
+                        clientinfo * cx = getinfo (atoi (Array [0]));
+                        if (!cx) return;
+                        int Mute_Unmute;
+                        if (Array[1] && Array [1] != NULL) 
+                            Mute_Unmute = atoi (Array [1]);
+                        else
+                            Mute_Unmute = cx->fullmute ? 0 : 1;
+                        Mute (5, cx->clientnum, Mute_Unmute);
+                    }
+                    else
+                    {
+                        defformatstring (Message)("\f3%s \f4Usage: \f6#fullmute \f4<cn> (0/1) \f3%s",
+                            MessageDecoration1,
+                            MessageDecoration2
+                        );
+                        sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                    }
+                }
+                else
+                {
+                    defformatstring (Message)("\f3%s \f4Usage: \f6#fullmute \f4<cn> (0/1) \f3%s",
+                        MessageDecoration1,
+                        MessageDecoration2
+                    );
+                    sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                }
+            }
+
         // <<< Commands declaration
 
         // >>> Commands / manpages initialization
@@ -4732,6 +5045,12 @@ namespace server
                 NewCommand ("noclearbots", false, PRIV_ADMIN , _NOCLEARBOTS);
                 NewCommand ("exec"       , false, PRIV_ROOT  , _EXEC       );
                 NewCommand ("getip"      , false, PRIV_ADMIN , _GETIP      );
+                NewCommand ("sendto"     , false, PRIV_MASTER, _SENDTO     );
+                NewCommand ("textmute"   , false, PRIV_MASTER, _TEXTMUTE   );
+                NewCommand ("editmute"   , false, PRIV_MASTER, _EDITMUTE   );
+                NewCommand ("namemute"   , false, PRIV_MASTER, _NAMEMUTE   );
+                NewCommand ("teammute"   , false, PRIV_MASTER, _TEAMMUTE   );
+                NewCommand ("fullmute"   , true , PRIV_MASTER, _FULLMUTE   );
             }
 
             void InitializeManpages ()
@@ -4753,6 +5072,12 @@ namespace server
                 NewManpage ("noclerabots", "(0/1)", "Enables / Disables auto clear bots on mapchange");
                 NewManpage ("exec", "<Command>", "Executes a Cube Script command.");
                 NewManpage ("getip", "<CN>", "Returns a player's IP address.");
+                NewManpage ("sendto", "<cn(,cn2(,...))>", "Sends the map to a specific player.");
+                NewManpage ("textmute", "<cn> (0/1)", "Un-/Mutes a player's text messages.");
+                NewManpage ("editmute", "<cn> (0/1)", "Un-/Mutes a player's edit messages.");
+                NewManpage ("namemute", "<cn> (0/1)", "Un-/Mutes a player's name-change messages.");
+                NewManpage ("teammute", "<cn> (0/1)", "Un-/Mutes a player's team-change messages.");
+                NewManpage ("fullmute", "<cn> (0/1)", "Un-/Mutes a player's text, edit, name-change and team-change messages.");
             }
 
         // <<< Commands / manpages initialization
@@ -4961,7 +5286,8 @@ namespace server
             case N_EDITMODE:
             {
                 int val = getint(p);
-                if(!ci->local && !m_edit) { cheater (ci, CHEAT_EDITHACK); break; }
+                if(!ci->local && !m_edit) { cheater (ci, CHEAT_EDITHACK); return; }
+                if (ci->editmute || ci->fullmute) return;
                 if(val ? ci->state.state!=CS_ALIVE && ci->state.state!=CS_DEAD : ci->state.state!=CS_EDITING) break;
                 if(smode)
                 {
@@ -5141,6 +5467,7 @@ namespace server
                 }
                 //QUEUE_AI;
                 //QUEUE_MSG;
+                if (cq->textmute || cq->fullmute) break;
                 filtertext(text, text);
                 QUEUE_AI;
                 QUEUE_INT(N_TEXT);
@@ -5152,7 +5479,20 @@ namespace server
             case N_SAYTEAM:
             {
                 getstring(text, p);
-                if(!ci || !cq || (ci->state.state==CS_SPECTATOR && !ci->local && !ci->privilege) || !m_teammode || !cq->team[0]) break;
+                if(!ci || !cq/* || (ci->state.state==CS_SPECTATOR && !ci->local && !ci->privilege) || !m_teammode || !cq->team[0]*/) break;
+                if (ci->textmute || ci->fullmute) break;
+                if (ci->state.state == CS_SPECTATOR)
+                {
+                    loopv (clients)
+                    {
+                        clientinfo * t = clients [i];
+                        if (t == cq || t->state.state != CS_SPECTATOR || t->state.aitype != AI_NONE) continue;
+                        sendf (t->clientnum, 1, "riis", N_SAYTEAM, cq->clientnum, text);
+                        if(isdedicatedserver() && cq) logoutf("(Spectators team chat) %s: %s", colorname(cq), text);
+                    }
+                    break;
+                }
+                if (!m_teammode || !cq->team[0]) break;
                 loopv(clients)
                 {
                     clientinfo *t = clients[i];
@@ -5165,8 +5505,7 @@ namespace server
 
             case N_SWITCHNAME:
             {
-                // Protect from name-protect
-                if (ci->wrong_names >= MaxAttempts) return;
+                if (ci->wrong_names >= MaxAttempts || ci->namemute || ci->fullmute) return;
                 getstring(text, p);
                 filtertext(ci->name, text, false, MAXNAMELEN);
                 // Name protection at N_SWITCHNAME:
@@ -5193,6 +5532,7 @@ namespace server
 
             case N_SWITCHTEAM:
             {
+                if (!ci || ci->teammute || ci->fullmute) return;
                 getstring(text, p);
                 filtertext(text, text, false, MAXTEAMLEN);
                 if(m_teammode && text[0] && strcmp(ci->team, text) && (!smode || smode->canchangeteam(ci, ci->team, text)) && addteaminfo(text))
@@ -5233,13 +5573,31 @@ namespace server
                 break;
             }
 
+            case N_EDITF: 
+            case N_EDITT:
+            case N_EDITM:
+            case N_FLIP:
+            case N_ROTATE:
+            case N_REPLACE:
+            case N_DELCUBE:
+            {
+                int size = server::msgsizelookup (type);
+                if (size <= 0) { cheater (ci, CHEAT_MSGSIZE); return; }
+                loopi (size - 1) getint(p);
+                if (!m_edit) { cheater (ci, CHEAT_EDITMSG); return; }
+                if (ci->editmute || ci->fullmute) return;
+                if (cq && (ci != cq || ci->state.state!=CS_SPECTATOR)) { QUEUE_AI; QUEUE_MSG; }
+                break;
+            }
+
             case N_EDITENT:
             {
                 int i = getint(p);
                 loopk(3) getint(p);
                 int type = getint(p);
                 loopk(5) getint(p);
-                if (!m_edit) {cheater (ci, CHEAT_EDITHACK); break;}
+                if (!m_edit) {cheater (ci, CHEAT_EDITMSG); break;}
+                if (ci->editmute || ci->fullmute) break;
                 if(!ci || ci->state.state==CS_SPECTATOR) break;
                 QUEUE_MSG;
                 bool canspawn = canspawnitem(type);
