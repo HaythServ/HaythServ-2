@@ -2336,7 +2336,7 @@ namespace server
             if(dup || h.dist<0 || h.dist>guns[gun].exprad)
             {
                 cheater (ci, CHEAT_EXPLOSION);
-                break;
+                return;
             }
 
             int damage = guns[gun].damage;
@@ -2371,11 +2371,11 @@ namespace server
             cheater (ci, CHEAT_FASTRELOAD);
             return;
         }
-        /* if (!gs.isalive (gamemillis))
+        if (!gs.isalive (gamemillis))
         {
             cheater (ci, CHEAT_NOTALIVE); 
             return;
-        } */
+        }
         if (m_insta && gun != GUN_FIST && gun != GUN_RIFLE)
         {
             cheater (ci, CHEAT_INSTAGUN);
@@ -2404,18 +2404,18 @@ namespace server
                     if (h.rays<1)
                     {
                         cheater (ci, CHEAT_NORAYS);
-                        break;
+                        return;
                     }
                     if (h.dist > guns[gun].range + 1)
                     {
                         cheater (ci, CHEAT_GUNRANGE);
-                        break;
+                        return;
                     }
                     totalrays += h.rays;
                     if(totalrays > maxrays)
                     {
                         cheater (ci, CHEAT_GUNRAYS);
-                        break;
+                        return;
                     }
                     int damage = h.rays*guns[gun].damage;
                     if(gs.quadmillis) damage *= 4;
@@ -2974,6 +2974,7 @@ namespace server
                 if (flagruntime < HSACFlagTime)
                 {
                     cheater (ci, CHEAT_FLAGHACK);
+                    return;
                 }
                 else
                 {
@@ -3020,7 +3021,7 @@ namespace server
                     }
                     string bestmsg;
                     if (!isbest){
-                        formatstring (bestmsg)("BEST: %s, %f", fr ? fr->Name : "", fr ? (float) (fr->Millis) / 1000.0f : 0.0f);
+                        formatstring (bestmsg)("BEST: \f6%s\f4, \f0%f\f4", fr ? fr->Name : "", fr ? (float) (fr->Millis) / 1000.0f : 0.0f);
                     }
                     sendservmsgf ("\f3%s \f0%s \f4scored the flag in \f0%f \f4seconds \f4[%s] \f3%s",
                         MessageDecoration1,
@@ -3075,7 +3076,7 @@ namespace server
                 string clanname;
                 string clantag;
                 account * owner;
-                vector<account> AuthorizedAccounts;
+                vector<account *> AuthorizedAccounts;
             };
 
             vector<account> accounts;
@@ -3189,7 +3190,7 @@ namespace server
                         loopvj (ReservedTags[i].AuthorizedAccounts)
                         {
                             formatstring (Message)("authorize %s %s\n",
-                                ReservedTags[i].clanname, ReservedTags[i].AuthorizedAccounts[j].username
+                                ReservedTags[i].clanname, ReservedTags[i].AuthorizedAccounts[j]->username
                             );
                             f->printf (Message);
                         }
@@ -3333,7 +3334,7 @@ namespace server
                         loopvj (ReservedTags[i].AuthorizedAccounts)
                         {
                             formatstring (Message)("authorize %s %s\n",
-                                ReservedTags[i].clanname, ReservedTags[i].AuthorizedAccounts[j].username
+                                ReservedTags[i].clanname, ReservedTags[i].AuthorizedAccounts[j]->username
                             );
                             f->printf (Message);
                         }
@@ -3456,7 +3457,7 @@ namespace server
                         loopvj (ReservedTags[i].AuthorizedAccounts)
                         {
                             formatstring (Message)("authorize %s %s\n",
-                                ReservedTags[i].clanname, ReservedTags[i].AuthorizedAccounts[j].username
+                                ReservedTags[i].clanname, ReservedTags[i].AuthorizedAccounts[j]->username
                             );
                             f->printf (Message);
                         }
@@ -3657,7 +3658,7 @@ namespace server
                 if (Counter >= MaxMembers) { if (Verbose) { logoutf ("Ignoring new clantag authorized user: Members limit reached for clan %s", Clan->clanname); } return; }
                 int i = Clan->AuthorizedAccounts.length ();
                 Clan->AuthorizedAccounts.add ();
-                Clan->AuthorizedAccounts[i] = * acc;
+                Clan->AuthorizedAccounts[i] = acc;
                 /*
                     account * Cur = &Clan->AuthorizedAccounts.add ();
                     copystring (Cur->username, acc->username);
@@ -4278,7 +4279,7 @@ namespace server
             void _INFO (clientinfo * ci, const char * Args)
             {
                 string Message;
-                formatstring (Message)("\f%s \f4HaythServ\f3-v2.0 \f4server mod, \f0based on \f3ORIGINAL SERVER\f4. \f3%s",
+                formatstring (Message)("\f3%s \f4HaythServ\f3-v2.0 \f4server mod, \f0based on the \f3original sauerbraten\f4-\f6SVN \f3server\f4. \f3%s",
                     MessageDecoration1,
                     MessageDecoration2
                 );
@@ -5022,12 +5023,58 @@ namespace server
                 }
             }
 
+            void _WHOIS (clientinfo * ci, const char * Args)
+            {
+
+            }
+
+            void _WHOISONLINE (clientinfo * ci, const char * Args)
+            {
+                string Message;
+                string Bak;
+                formatstring (Message, "\f3%s \f4Verified clients: ",
+                    MessageDecoration1
+                );
+                bool found = false;
+                loopv (clients)
+                {
+                    clientinfo * ci = &clients [i];
+                    if (!ci) continue;
+                    if (!ci->acc || !ci->verified) continue;
+                    copystirng (Bak, Message);
+                    formatstring (Message, "%s%s\f0%s \f4 as \f5'%s'",
+                        Bak,
+                        found ? ", " : " ",
+                        colorname (ci),
+                        ci->acc->username
+                    );
+                    found = true;
+                }
+                if (!found)
+                {
+                    formatstring (Message, "\f3%s \f4At the moment there are no verified clients. \f3%s",
+                        MessageDecoration1,
+                        MessageDecoration2
+                    );
+                }
+                else
+                {
+                    copystring (Bak, Message);
+                    formatstring (Message, "%s \f3%s",
+                        Bak,
+                        MessageDecoration2
+                    );
+                }
+                sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+            }
+
         // <<< Commands declaration
 
         // >>> Commands / manpages initialization
 
             void InitializeCommands ()
             {
+                // General player-commands.
                 NewCommand ("man"        , false, PRIV_NONE  , _HELP       );
                 NewCommand ("help"       , false, PRIV_NONE  , _HELP       );
                 NewCommand ("info"       , false, PRIV_NONE  , _INFO       );
@@ -5036,20 +5083,23 @@ namespace server
                 NewCommand ("register"   , false, PRIV_NONE  , _REGISTER   );
                 NewCommand ("pm"         , false, PRIV_NONE  , _MSG        );
                 NewCommand ("stats"      , false, PRIV_NONE  , _STATS      );
+                NewCommand ("whoisonline", false, PRIV_NONE  , _WHOISONLINE);
                 NewCommand ("givemaster" , false, PRIV_MASTER, _GIVEMASTER );
-                NewCommand ("giveadmin"  , false, PRIV_ADMIN , _GIVEADMIN  );
-                NewCommand ("rename"     , false, PRIV_ADMIN , _RENAME     );
-                NewCommand ("setprivs"   , false, PRIV_ROOT  , _SETPRIVS   );
-                NewCommand ("revokepriv" , false, PRIV_MASTER, _REVOKEPRIV );
-                NewCommand ("persist"    , false, PRIV_MASTER, _PERSIST    );
-                NewCommand ("noclearbots", false, PRIV_ADMIN , _NOCLEARBOTS);
-                NewCommand ("exec"       , false, PRIV_ROOT  , _EXEC       );
-                NewCommand ("getip"      , false, PRIV_ADMIN , _GETIP      );
                 NewCommand ("sendto"     , false, PRIV_MASTER, _SENDTO     );
                 NewCommand ("textmute"   , false, PRIV_MASTER, _TEXTMUTE   );
                 NewCommand ("editmute"   , false, PRIV_MASTER, _EDITMUTE   );
                 NewCommand ("namemute"   , false, PRIV_MASTER, _NAMEMUTE   );
                 NewCommand ("teammute"   , false, PRIV_MASTER, _TEAMMUTE   );
+                //NewCommand ("whois"      , false, PRIV_MASTER, _WHOIS      );
+                NewCommand ("revokepriv" , false, PRIV_MASTER, _REVOKEPRIV );
+                NewCommand ("persist"    , false, PRIV_MASTER, _PERSIST    );
+                NewCommand ("giveadmin"  , false, PRIV_ADMIN , _GIVEADMIN  );
+                NewCommand ("rename"     , false, PRIV_ADMIN , _RENAME     );
+                NewCommand ("noclearbots", false, PRIV_ADMIN , _NOCLEARBOTS);
+                NewCommand ("getip"      , false, PRIV_ADMIN , _GETIP      );
+                NewCommand ("setprivs"   , false, PRIV_ROOT  , _SETPRIVS   );
+                NewCommand ("exec"       , false, PRIV_ROOT  , _EXEC       );
+                // Player-commands for verified players only.
                 NewCommand ("fullmute"   , true , PRIV_MASTER, _FULLMUTE   );
             }
 
@@ -5078,6 +5128,8 @@ namespace server
                 NewManpage ("namemute", "<cn> (0/1)", "Un-/Mutes a player's name-change messages.");
                 NewManpage ("teammute", "<cn> (0/1)", "Un-/Mutes a player's team-change messages.");
                 NewManpage ("fullmute", "<cn> (0/1)", "Un-/Mutes a player's text, edit, name-change and team-change messages.");
+                NewManpage ("whoisonline", "", "Displays a list of verified clients who are connected.");
+                //NewManpage ("whois", "<cn>", "Displays a list of names used by a client.");
             }
 
         // <<< Commands / manpages initialization
@@ -5119,17 +5171,6 @@ namespace server
                         ci->connectauth = disc;
                     }
                     else connected(ci);
-                    ci->acc = 0;
-                    ci->verified = false;
-                    // Name protection at N_CONNECT:
-                    loopv (ReservedNames)
-                    {
-                        if (!strcmp (text, ReservedNames[i].name))
-                        {
-                            Rename (ci);
-                            break;
-                        }
-                    }
                     // If HSAC is enabled, disconnect pbanned cheaters.
                     if (HSAntiCheat)
                     {
@@ -5146,6 +5187,17 @@ namespace server
                                 );
                                 return;
                             }
+                        }
+                    }
+                    ci->acc = 0;
+                    ci->verified = false;
+                    // Name protection at N_CONNECT:
+                    loopv (ReservedNames)
+                    {
+                        if (!strcmp (text, ReservedNames[i].name))
+                        {
+                            Rename (ci);
+                            break;
                         }
                     }
                     // If HSAC is enabled, warn the client about the anticheat.
@@ -5532,7 +5584,7 @@ namespace server
 
             case N_SWITCHTEAM:
             {
-                if (!ci || ci->teammute || ci->fullmute) return;
+                if (!ci || ((ci->teammute || ci->fullmute) && ((m_ctf && strcmp (ci->team, "good") && strcmp (ci->team, "evil")) || (m_teammode && !ci->team[0])))) return;
                 getstring(text, p);
                 filtertext(text, text, false, MAXTEAMLEN);
                 if(m_teammode && text[0] && strcmp(ci->team, text) && (!smode || smode->canchangeteam(ci, ci->team, text)) && addteaminfo(text))
@@ -5596,7 +5648,7 @@ namespace server
                 loopk(3) getint(p);
                 int type = getint(p);
                 loopk(5) getint(p);
-                if (!m_edit) {cheater (ci, CHEAT_EDITMSG); break;}
+                if (!m_edit) {cheater (ci, CHEAT_EDITMSG); return;}
                 if (ci->editmute || ci->fullmute) break;
                 if(!ci || ci->state.state==CS_SPECTATOR) break;
                 QUEUE_MSG;

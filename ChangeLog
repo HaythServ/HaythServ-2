@@ -1,6 +1,12 @@
 ChangeLog
 =========
 
+haythserv-2-1-1
+
+	* Bugfixed #7.
+	* Bugfixed #8.
+	* Added whoisonline player-command for accounting system.
+
 haythserv-2-1-0
 
 	* Added spectators team-chat.
