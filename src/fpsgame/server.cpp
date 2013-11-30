@@ -3021,9 +3021,9 @@ namespace server
                     }
                     string bestmsg;
                     if (!isbest){
-                        formatstring (bestmsg)("BEST: \f6%s\f4, \f0%f\f4", fr ? fr->Name : "", fr ? (float) (fr->Millis) / 1000.0f : 0.0f);
+                        formatstring (bestmsg)("BEST: \f6%s\f4, \f0%.3f\f4", fr ? fr->Name : "", fr ? (float) (fr->Millis) / 1000.0f : 0.0f);
                     }
-                    sendservmsgf ("\f3%s \f0%s \f4scored the flag in \f0%f \f4seconds \f4[%s] \f3%s",
+                    sendservmsgf ("\f3%s \f0%s \f4scored the flag in \f0%.3f \f4seconds \f4[%s] \f3%s",
                         MessageDecoration1,
                         ci->name,
                         (float) (flagruntime) / 1000.0f,
@@ -3053,16 +3053,16 @@ namespace server
                 string username;
                 string password;
                 string ipaddr;
-                int privileges = 0;
-                int hidden = 0;
-                uint global_frags = 0;
-                uint global_deaths = 0;
-                double global_kpd = 0.0;
-                double global_accuracy = 0.0;
-                uint global_teamkills = 0;
-                uint global_scored = 0;
-                uint global_matches = 0;
-                uint global_ranking = 0;
+                int privileges;
+                int hidden;
+                uint global_frags;
+                uint global_deaths;
+                double global_kpd;
+                double global_accuracy;
+                uint global_teamkills;
+                uint global_scored;
+                uint global_matches;
+                uint global_ranking;
             };
 
             struct ReservedName
@@ -3573,6 +3573,15 @@ namespace server
                 copystring (acc.ipaddr  , IP);
                 acc.privileges = clamp (privileges, (int) PRIV_NONE, (int) PRIV_ROOT);
                 acc.hidden = clamp (hidden, 0, 1);
+                // >>> Account default stats
+                    acc.global_frags = 0;
+                    acc.global_deaths = 0;
+                    acc.global_kpd = 0.0;
+                    acc.global_accuracy = 0.0;
+                    acc.global_teamkills = 0;
+                    acc.global_scored = 0;
+                    acc.global_matches = 0;
+                // <<< Account default stats
             }
 
             void NewReserve (const char * user, const char * name)
@@ -3747,8 +3756,8 @@ namespace server
             struct Command
             {
                 string Name;
-                bool RequiresVerify = false;
-                int RequiredPrivileges = PRIV_NONE;
+                bool RequiresVerify;
+                int RequiredPrivileges;
                 void (* Function) (clientinfo * ci, const char * Arguments);
             };
 
@@ -4289,7 +4298,7 @@ namespace server
                     MessageDecoration2
                 );
                 sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
-                formatstring (Message)("\f3%s \f4Developed by: \f6~Haytham \f4(AKA \f6/dev/tty1 \f4AKA \f6Vice\f4) \f3%s",
+                formatstring (Message)("\f3%s \f4Developed by: \f6/dev/tty1 \f3%s",
                     MessageDecoration1,
                     MessageDecoration2
                 );
@@ -4325,6 +4334,89 @@ namespace server
 #else
                     "\f0Windows",
 #endif
+                    MessageDecoration2
+                );
+                sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
+                int Time = totalsecs;
+                int Years = 0;
+                while (Time >= (60 * 60 * 24 * 30 * 12)) // Years
+                {
+                    Years ++;
+                    Time -= (60 * 60 * 24 * 30 * 12);
+                }
+                int Months = 0;
+                while (Time >= (60 * 60 * 24 * 30)) // Months
+                {
+                    Months ++;
+                    Time -= (60 * 60 * 24 * 30);
+                }
+                int Weeks = 0;
+                while (Time >= (60 * 60 * 24 * 7)) // Weeks
+                {
+                    Weeks ++;
+                    Time -= (60 * 60 * 24 * 7);
+                }
+                int Days = 0;
+                while (Time >= (60 * 60 * 24)) // Days
+                {
+                    Days ++;
+                    Time -= (60 * 60 * 24);
+                }
+                int Hours = 0;
+                while (Time >= (60 * 60)) // Hours
+                {
+                    Hours ++;
+                    Time -= (60 * 60);
+                }
+                int Minutes = 0;
+                while (Time >= (60)) // Minutes
+                {
+                    Minutes ++;
+                    Time -= (60);
+                }
+                int Seconds = 0;
+                while (Time >= (1)) // Seconds
+                {
+                    Seconds ++;
+                    Time -= (1);
+                }
+                string ymsg;
+                string mmsg;
+                string wmsg;
+                string dmsg;
+                string hmsg;
+                string Mmsg;
+                string smsg;
+                formatstring (ymsg)(" \f4Years: \f0%i",
+                    Years
+                );
+                formatstring (mmsg)(" \f4Months: \f0%i",
+                    Months
+                );
+                formatstring (wmsg)(" \f4Weeks: \f0%i",
+                    Weeks
+                );
+                formatstring (dmsg)(" \f4Days: \f0%i",
+                    Days
+                );
+                formatstring (hmsg)(" \f4Hours: \f0%i",
+                    Hours
+                );
+                formatstring (Mmsg)(" \f4Minutes: \f0%i",
+                    Minutes
+                );
+                formatstring (smsg)(" \f4Seconds: \f0%i",
+                    Seconds
+                );
+                formatstring (Message)("\f3%s \f6Server uptime\f4:%s%s%s%s%s%s%s \f3%s",
+                    MessageDecoration1,
+                    (totalsecs >= (60 * 60 * 24 * 30 * 12)) ? ymsg : "",
+                    (totalsecs >= (60 * 60 * 24 * 30)) ? mmsg : "",
+                    (totalsecs >= (60 * 60 * 24 * 7)) ? wmsg : "",
+                    (totalsecs >= (60 * 60 * 24)) ? dmsg : "",
+                    (totalsecs >= (60 * 60)) ? hmsg : "",
+                    (totalsecs >= (60)) ? Mmsg : "",
+                    (totalsecs >= (1)) ? smsg : "",
                     MessageDecoration2
                 );
                 sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
@@ -5032,19 +5124,19 @@ namespace server
             {
                 string Message;
                 string Bak;
-                formatstring (Message, "\f3%s \f4Verified clients: ",
+                formatstring (Message)("\f3%s \f4Verified clients: ",
                     MessageDecoration1
                 );
                 bool found = false;
                 loopv (clients)
                 {
-                    clientinfo * ci = &clients [i];
+                    clientinfo * ci = clients [i];
                     if (!ci) continue;
                     if (!ci->acc || !ci->verified) continue;
-                    copystirng (Bak, Message);
-                    formatstring (Message, "%s%s\f0%s \f4 as \f5'%s'",
+                    copystring (Bak, Message);
+                    formatstring (Message)("%s%s\f0%s \f4as \f5'%s'",
                         Bak,
-                        found ? ", " : " ",
+                        found ? ", " : "",
                         colorname (ci),
                         ci->acc->username
                     );
@@ -5052,7 +5144,7 @@ namespace server
                 }
                 if (!found)
                 {
-                    formatstring (Message, "\f3%s \f4At the moment there are no verified clients. \f3%s",
+                    formatstring (Message)("\f3%s \f4At the moment there are no verified clients. \f3%s",
                         MessageDecoration1,
                         MessageDecoration2
                     );
@@ -5060,7 +5152,7 @@ namespace server
                 else
                 {
                     copystring (Bak, Message);
-                    formatstring (Message, "%s \f3%s",
+                    formatstring (Message)("%s \f3%s",
                         Bak,
                         MessageDecoration2
                     );
@@ -5090,7 +5182,7 @@ namespace server
                 NewCommand ("editmute"   , false, PRIV_MASTER, _EDITMUTE   );
                 NewCommand ("namemute"   , false, PRIV_MASTER, _NAMEMUTE   );
                 NewCommand ("teammute"   , false, PRIV_MASTER, _TEAMMUTE   );
-                //NewCommand ("whois"      , false, PRIV_MASTER, _WHOIS      );
+                NewCommand ("whois"      , false, PRIV_MASTER, _WHOIS      );
                 NewCommand ("revokepriv" , false, PRIV_MASTER, _REVOKEPRIV );
                 NewCommand ("persist"    , false, PRIV_MASTER, _PERSIST    );
                 NewCommand ("giveadmin"  , false, PRIV_ADMIN , _GIVEADMIN  );
@@ -5129,7 +5221,7 @@ namespace server
                 NewManpage ("teammute", "<cn> (0/1)", "Un-/Mutes a player's team-change messages.");
                 NewManpage ("fullmute", "<cn> (0/1)", "Un-/Mutes a player's text, edit, name-change and team-change messages.");
                 NewManpage ("whoisonline", "", "Displays a list of verified clients who are connected.");
-                //NewManpage ("whois", "<cn>", "Displays a list of names used by a client.");
+                NewManpage ("whois", "<cn>", "Displays a list of names used by a client.");
             }
 
         // <<< Commands / manpages initialization
@@ -5209,6 +5301,7 @@ namespace server
                         );
                         sendf (ci ? ci->clientnum : -1, 1, "ris", N_SERVMSG, Message);
                     }
+                    ci->wrong_attempts = 0;
                     break;
                 }
 
@@ -6064,5 +6157,4 @@ namespace server
 
     #include "aiman.h"
 }
-
 

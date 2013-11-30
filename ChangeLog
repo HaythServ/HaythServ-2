@@ -1,11 +1,15 @@
 ChangeLog
 =========
 
+haythserv-2-1-2
+	
+	* Added whoisonline player-command for accounting system.
+	* Improved #info.
+
 haythserv-2-1-1
 
 	* Bugfixed #7.
 	* Bugfixed #8.
-	* Added whoisonline player-command for accounting system.
 
 haythserv-2-1-0
 
